@@ -2,7 +2,7 @@ import './StudentSignup.css?v=3';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { signUp } from '../../api/auth';
-import { createDocument } from '../../api/db';
+import { saveStudentProfile } from '../../api/profiles';
 
 function StudentSignup() {
   const navigate = useNavigate();
@@ -15,10 +15,19 @@ function StudentSignup() {
 
     try {
       const data = await signUp(formData.student_id, formData.email, formData.password);
-      await createDocument('student_profiles', formData.student_id, {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('currentStudent', JSON.stringify({
         student_id: formData.student_id,
+        email: formData.email,
         phone: formData.phone,
         semester: formData.semester
+      }));
+      await saveStudentProfile(formData.student_id, {
+        student_id: formData.student_id,
+        email: formData.email,
+        phone: formData.phone,
+        semester: parseInt(formData.semester),
+        name: formData.email.split('@')[0]
       });
       alert('Registration successful!');
       navigate('/login');

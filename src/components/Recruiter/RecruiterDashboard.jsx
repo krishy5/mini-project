@@ -2,8 +2,9 @@ import './RecruiterDashboard.css';
 import '../../theme.css';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getEvents, getRemovedEvents } from '../../utils/eventsStore';
-import { getJobs, saveJobs, getInternships, saveInternships } from '../../utils/jobsStore';
+import { getEvents } from '../../utils/eventsStore';
+import { getRecruiterJobs, addJob, deleteJob } from '../../utils/jobsStore';
+import { getApplicants } from '../../utils/jobsStore';
 
 function RecruiterDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -1232,57 +1233,26 @@ function NotificationsContent() {
 
 function EventsContent() {
   const [filter, setFilter] = useState('All');
-  const [registeredEvents, setRegisteredEvents] = useState([]);
-  const [eventCounts, setEventCounts] = useState({});
-  const [customEvents, setCustomEvents] = useState([]);
-  const [removedEvents, setRemovedEvents] = useState([]);
-  
+  const [events, setEvents] = useState([
+    { id: 1, type: 'Workshop', title: 'Workshop: AI & Machine Learning', desc: 'Hands-on workshop on modern AI/ML techniques.', date: '25 February 2026', time: '10:00 AM', location: 'Computer Lab 3, Block A', registered: '58/60', percent: 97, daysLeft: 6, color: '#0d9488' },
+    { id: 2, type: 'Seminar', title: 'Leadership & Entrepreneurship Summit', desc: 'Learn from successful entrepreneurs and industry leaders.', date: '28 February 2026', time: '10:00 AM', location: 'Conference Hall, Admin Block', registered: '210/300', percent: 70, daysLeft: 9, color: '#7c3aed' },
+    { id: 3, type: 'Placement', title: 'Campus Recruitment Drive - Top MNCs', desc: 'Exclusive placement drive featuring top companies.', date: '5 March 2026', time: '08:00 AM', location: 'Placement Cell, Block B', registered: '187/200', percent: 94, daysLeft: 14, color: '#059669' },
+    { id: 4, type: 'Technical', title: 'TechFest 2026 - Annual Technical Festival', desc: 'Hackathons, coding competitions, robotics challenges.', date: '10 March 2026', time: '09:00 AM', location: 'Main Auditorium & Tech Park', registered: '342/500', percent: 68, daysLeft: 19, color: '#1e40af' },
+    { id: 5, type: 'Sports', title: 'Sports Week 2026', desc: 'Annual inter-department sports competition.', date: '15 March 2026', time: '07:00 AM', location: 'Sports Complex & Ground', registered: '456/1000', percent: 46, daysLeft: 24, color: '#c2410c' },
+    { id: 6, type: 'Cultural', title: 'Cultural Night 2026 - Rang Mahotsav', desc: 'Dance, music, drama, and talent show.', date: '20 March 2026', time: '06:00 PM', location: 'Open Air Theatre', registered: '523/800', percent: 65, daysLeft: 29, color: '#7e22ce' }
+  ]);
+
   useEffect(() => {
-    setCustomEvents(getEvents());
-    setRemovedEvents(getRemovedEvents());
-    
-    const handleStorageChange = () => {
-      setCustomEvents(getEvents());
-      setRemovedEvents(getRemovedEvents());
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    getEvents().then(apiEvents => {
+      if (Array.isArray(apiEvents) && apiEvents.length > 0)
+        setEvents(prev => [...prev, ...apiEvents]);
+    }).catch(() => {});
   }, []);
-  
-  const events = [
-    { id: 1, type: 'Workshop', title: 'Workshop: AI & Machine Learning', desc: 'Hands-on workshop on modern AI/ML techniques. Learn neural networks, NLP, and computer vision. Certificate will be provided to...', date: '25 February 2026', time: '10:00 AM', location: 'Computer Lab 3, Block A', registered: '58/60', percent: 97, daysLeft: 6, color: '#0d9488' },
-    { id: 2, type: 'Seminar', title: 'Leadership & Entrepreneurship Summit', desc: 'Learn from successful entrepreneurs and industry leaders. Panel discussions, networking sessions, and startup pitching competition...', date: '28 February 2026', time: '10:00 AM', location: 'Conference Hall, Admin Block', registered: '210/300', percent: 70, daysLeft: 9, color: '#7c3aed' },
-    { id: 3, type: 'Placement', title: 'Campus Recruitment Drive - Top MNCs', desc: 'Exclusive placement drive featuring Google, Microsoft, Amazon, and 20+ other companies. On-the-spot interviews and offers. Register...', date: '5 March 2026', time: '08:00 AM', location: 'Placement Cell, Block B', registered: '187/200', percent: 94, daysLeft: 14, color: '#059669' },
-    { id: 4, type: 'Technical', title: 'TechFest 2026 - Annual Technical Festival', desc: 'Join us for the biggest tech festival of the year! Participate in hackathons, coding competitions, robotics challenges, and AI/ML...', date: '10 March 2026', time: '09:00 AM', location: 'Main Auditorium & Tech Park', registered: '342/500', percent: 68, daysLeft: 19, color: '#1e40af' },
-    { id: 5, type: 'Sports', title: 'Sports Week 2026', desc: 'Annual inter-department sports competition. Events include cricket, football, basketball, badminton, chess, and athletics. Register your...', date: '15 March 2026', time: '07:00 AM', location: 'Sports Complex & Ground', registered: '456/1000', percent: 46, daysLeft: 24, color: '#c2410c' },
-    { id: 6, type: 'Cultural', title: 'Cultural Night 2026 - Rang Mahotsav', desc: 'The grandest cultural celebration! Dance, music, drama, and talent show. Showcase your talents and win exciting prizes. Open to all...', date: '20 March 2026', time: '06:00 PM', location: 'Open Air Theatre', registered: '523/800', percent: 65, daysLeft: 29, color: '#7e22ce' },
-    ...customEvents
-  ].filter(e => !removedEvents.includes(e.id));
 
   const filtered = filter === 'All' ? events : events.filter(e => e.type === filter);
 
-  const handleRegister = (eventId) => {
-    setRegisteredEvents([...registeredEvents, eventId]);
-    setEventCounts({...eventCounts, [eventId]: (eventCounts[eventId] || 0) + 1});
-  };
-
-  const getRegisteredCount = (event) => {
-    const [current, total] = event.registered.split('/');
-    const newCurrent = parseInt(current) + (eventCounts[event.id] || 0);
-    return `${newCurrent}/${total}`;
-  };
-
-  const getPercent = (event) => {
-    const [current, total] = event.registered.split('/');
-    const newCurrent = parseInt(current) + (eventCounts[event.id] || 0);
-    return Math.round((newCurrent / parseInt(total)) * 100);
-  };
+  const getRegisteredCount = (event) => event.registered || '0/100';
+  const getPercent = (event) => event.percent || 0;
 
   return (
     <div className="events-content">
@@ -1325,15 +1295,8 @@ function EventsContent() {
                 <div className="reg-bar" style={{width: getPercent(event) + '%', backgroundColor: getPercent(event) > 90 ? '#ef4444' : getPercent(event) > 70 ? '#f59e0b' : '#3b82f6'}}></div>
               </div>
             </div>
-            <button className="register-btn" style={{borderColor: event.color, color: event.color, ...(registeredEvents.includes(event.id) && {background: event.color, color: 'white'})}} onClick={() => handleRegister(event.id)} disabled={registeredEvents.includes(event.id)}>
-              {registeredEvents.includes(event.id) ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 6L9 17l-5-5"/>
-                  </svg>
-                  Registered
-                </>
-              ) : 'Register Now'}
+            <button className="register-btn" style={{borderColor: event.color, color: event.color}} disabled>
+              View Only
             </button>
           </div>
         ))}
@@ -1347,57 +1310,26 @@ function MeritListContent() {
   const [filter, setFilter] = useState('All');
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
-    try {
-      const handleStorageChange = () => {
-        const savedStudents = JSON.parse(localStorage.getItem('students') || '[]');
-        const applications = JSON.parse(localStorage.getItem('applications') || '[]');
-        const jobs = JSON.parse(localStorage.getItem(`recruiterJobs_${recruiter.recruiter_id}`) || '[]');
-        const internships = JSON.parse(localStorage.getItem(`recruiterInternships_${recruiter.recruiter_id}`) || '[]');
-        const myJobIds = [...jobs.map(j => j.id), ...internships.map(i => i.id)];
-        const applicants = [];
-        
-        applications.forEach(app => {
-          if (myJobIds.includes(app.jobId)) {
-            const student = savedStudents.find(s => s.student_id === app.student_id);
-            if (student) {
-              const allJobs = [...jobs, ...internships];
-              const job = allJobs.find(j => j.id === app.jobId);
-              if (job) {
-                applicants.push({
-                  id: app.id,
-                  name: student.email.split('@')[0],
-                  email: student.email,
-                  dept: 'Computer Science',
-                  skills: 'React, Python, Node.js',
-                  experience: '2 years',
-                  position: job.role,
-                  score: app.score,
-                  type: job.type
-                });
-              }
-            }
-          }
-        });
-        
-        setStudents(applicants.sort((a, b) => b.score - a.score));
-        setLoading(false);
-      };
-      
-      handleStorageChange();
-      window.addEventListener('storage', handleStorageChange);
-      const interval = setInterval(handleStorageChange, 1000);
-      
-      return () => {
-        window.removeEventListener('storage', handleStorageChange);
-        clearInterval(interval);
-      };
-    } catch (error) {
-      console.error('Error loading students:', error);
-      setStudents([]);
+    if (!recruiter.recruiter_id) { setLoading(false); return; }
+    getApplicants(recruiter.recruiter_id).then(data => {
+      if (Array.isArray(data)) {
+        const mapped = data.map((app, idx) => ({
+          id: app._id || idx,
+          name: app.student_id,
+          email: '',
+          dept: 'Computer Science',
+          skills: '',
+          experience: '',
+          position: app.job_id?.role || 'N/A',
+          score: app.score,
+          type: app.job_id?.type || 'Placement'
+        }));
+        setStudents(mapped.sort((a, b) => b.score - a.score));
+      }
       setLoading(false);
-    }
+    }).catch(() => setLoading(false));
   }, [recruiter.recruiter_id]);
 
   const getFilteredApplicants = () => {
@@ -1475,31 +1407,19 @@ function MeritListContent() {
 
 function JobsContent() {
   const recruiter = JSON.parse(localStorage.getItem('currentRecruiter') || '{}');
-  const [jobs, setJobs] = useState(() => {
-    const saved = localStorage.getItem(`recruiterJobs_${recruiter.recruiter_id}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [jobs, setJobs] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newJob, setNewJob] = useState({company: '', role: '', logo: '', location: '', salary: '', deadline: '', color: '#f97316'});
-  
+
   useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem(`recruiterJobs_${recruiter.recruiter_id}`);
-      setJobs(saved ? JSON.parse(saved) : []);
-    };
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    if (!recruiter.recruiter_id) return;
+    getRecruiterJobs(recruiter.recruiter_id).then(data => {
+      if (Array.isArray(data)) setJobs(data.filter(j => j.type === 'Placement'));
+    }).catch(() => {});
   }, [recruiter.recruiter_id]);
 
   const handleRemove = (jobId) => {
-    const updated = jobs.filter(j => j.id !== jobId);
-    setJobs(updated);
-    localStorage.setItem(`recruiterJobs_${recruiter.recruiter_id}`, JSON.stringify(updated));
-    saveJobs([...getJobs().filter(j => j.id !== jobId)]);
+    deleteJob(jobId).then(() => setJobs(prev => prev.filter(j => j._id !== jobId))).catch(() => {});
   };
 
   const handleAddJob = () => {
@@ -1507,13 +1427,11 @@ function JobsContent() {
       alert('Please fill all fields');
       return;
     }
-    const job = {...newJob, id: Date.now(), logo: newJob.company.charAt(0).toUpperCase(), type: 'Placement', recruiterId: recruiter.recruiter_id};
-    const updated = [...jobs, job];
-    setJobs(updated);
-    localStorage.setItem(`recruiterJobs_${recruiter.recruiter_id}`, JSON.stringify(updated));
-    saveJobs([...getJobs(), job]);
-    setNewJob({company: '', role: '', logo: '', location: '', salary: '', deadline: '', color: '#f97316'});
-    setShowAddModal(false);
+    addJob({...newJob, logo: newJob.company.charAt(0).toUpperCase(), type: 'Placement'}).then(job => {
+      setJobs(prev => [...prev, job]);
+      setNewJob({company: '', role: '', logo: '', location: '', salary: '', deadline: '', color: '#f97316'});
+      setShowAddModal(false);
+    }).catch(() => alert('Failed to add job'));
   };
 
   return (
@@ -1544,7 +1462,7 @@ function JobsContent() {
               <div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> {job.salary}</div>
               <div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Deadline: {job.deadline}</div>
             </div>
-            <button className="view-details-btn" onClick={() => handleRemove(job.id)} style={{background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#f87171'}}>
+            <button className="view-details-btn" onClick={() => handleRemove(job._id || job.id)} style={{background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#f87171'}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
               </svg>
@@ -1624,31 +1542,19 @@ function JobsContent() {
 
 function InternshipsContent() {
   const recruiter = JSON.parse(localStorage.getItem('currentRecruiter') || '{}');
-  const [internships, setInternships] = useState(() => {
-    const saved = localStorage.getItem(`recruiterInternships_${recruiter.recruiter_id}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [internships, setInternships] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newInternship, setNewInternship] = useState({company: '', role: '', logo: '', location: '', salary: '', deadline: '', color: '#10b981'});
-  
+
   useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem(`recruiterInternships_${recruiter.recruiter_id}`);
-      setInternships(saved ? JSON.parse(saved) : []);
-    };
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    if (!recruiter.recruiter_id) return;
+    getRecruiterJobs(recruiter.recruiter_id).then(data => {
+      if (Array.isArray(data)) setInternships(data.filter(j => j.type === 'Internship'));
+    }).catch(() => {});
   }, [recruiter.recruiter_id]);
 
   const handleRemove = (internshipId) => {
-    const updated = internships.filter(i => i.id !== internshipId);
-    setInternships(updated);
-    localStorage.setItem(`recruiterInternships_${recruiter.recruiter_id}`, JSON.stringify(updated));
-    saveInternships([...getInternships().filter(i => i.id !== internshipId)]);
+    deleteJob(internshipId).then(() => setInternships(prev => prev.filter(i => i._id !== internshipId))).catch(() => {});
   };
 
   const handleAddInternship = () => {
@@ -1656,13 +1562,11 @@ function InternshipsContent() {
       alert('Please fill all fields');
       return;
     }
-    const internship = {...newInternship, id: Date.now(), logo: newInternship.company.charAt(0).toUpperCase(), type: 'Internship', recruiterId: recruiter.recruiter_id};
-    const updated = [...internships, internship];
-    setInternships(updated);
-    localStorage.setItem(`recruiterInternships_${recruiter.recruiter_id}`, JSON.stringify(updated));
-    saveInternships([...getInternships(), internship]);
-    setNewInternship({company: '', role: '', logo: '', location: '', salary: '', deadline: '', color: '#10b981'});
-    setShowAddModal(false);
+    addJob({...newInternship, logo: newInternship.company.charAt(0).toUpperCase(), type: 'Internship'}).then(internship => {
+      setInternships(prev => [...prev, internship]);
+      setNewInternship({company: '', role: '', logo: '', location: '', salary: '', deadline: '', color: '#10b981'});
+      setShowAddModal(false);
+    }).catch(() => alert('Failed to add internship'));
   };
 
   return (
@@ -1693,7 +1597,7 @@ function InternshipsContent() {
               <div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> {intern.salary}</div>
               <div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Deadline: {intern.deadline}</div>
             </div>
-            <button className="view-details-btn" onClick={() => handleRemove(intern.id)} style={{background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#f87171'}}>
+            <button className="view-details-btn" onClick={() => handleRemove(intern._id || intern.id)} style={{background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#f87171'}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
               </svg>
@@ -1774,23 +1678,20 @@ function InternshipsContent() {
 function DashboardContent() {
   const recruiter = JSON.parse(localStorage.getItem('currentRecruiter') || '{}');
   const [stats, setStats] = useState({jobs: 0, internships: 0, applicants: 0});
-  
+
   useEffect(() => {
-    const updateStats = () => {
-      const jobs = JSON.parse(localStorage.getItem(`recruiterJobs_${recruiter.recruiter_id}`) || '[]');
-      const internships = JSON.parse(localStorage.getItem(`recruiterInternships_${recruiter.recruiter_id}`) || '[]');
-      const applications = JSON.parse(localStorage.getItem('applications') || '[]');
-      const myJobIds = [...jobs.map(j => j.id), ...internships.map(i => i.id)];
-      const myApplicants = applications.filter(app => myJobIds.includes(app.jobId));
+    if (!recruiter.recruiter_id) return;
+    Promise.all([
+      getRecruiterJobs(recruiter.recruiter_id),
+      getApplicants(recruiter.recruiter_id)
+    ]).then(([allJobs, applicants]) => {
+      const jobs = Array.isArray(allJobs) ? allJobs : [];
       setStats({
-        jobs: jobs.length,
-        internships: internships.length,
-        applicants: myApplicants.length
+        jobs: jobs.filter(j => j.type === 'Placement').length,
+        internships: jobs.filter(j => j.type === 'Internship').length,
+        applicants: Array.isArray(applicants) ? applicants.length : 0
       });
-    };
-    updateStats();
-    const interval = setInterval(updateStats, 1000);
-    return () => clearInterval(interval);
+    }).catch(() => {});
   }, [recruiter.recruiter_id]);
   
   return (

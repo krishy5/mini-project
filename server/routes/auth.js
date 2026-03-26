@@ -32,7 +32,12 @@ router.post('/signup', async (req, res) => {
     });
 
     await student.save();
-    res.status(201).json({ message: 'Student registered successfully' });
+    const token = jwt.sign(
+      { id: student._id, student_id: student.student_id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.status(201).json({ token, student_id: student.student_id });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }

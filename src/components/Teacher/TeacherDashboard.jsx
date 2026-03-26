@@ -3,7 +3,7 @@ import '../Student/StudentDashboard.css';
 import '../../theme.css';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getEvents, saveEvents, getRemovedEvents, saveRemovedEvents } from '../../utils/eventsStore';
+import { getEvents, addEvent, removeEvent } from '../../utils/eventsStore';
 import { getJobs, getInternships } from '../../utils/jobsStore';
 import { getClubs, saveClubs } from '../../utils/clubsStore';
 import MeritListDemo from '../Demo/MeritListDemo';
@@ -155,10 +155,7 @@ function PaymentsContent() {
 
 function ClubsContent() {
   const [filter, setFilter] = useState('All');
-  const [clubs, setClubs] = useState(() => {
-    const stored = getClubs();
-    if (stored.length === 0) {
-      const defaultClubs = [
+  const defaultClubs = [
         { id: 1, name: 'NSS - National Service Scheme', desc: 'Community service, blood donation drives, cleanliness campaigns, and rural outreach programs.', members: 334, category: 'Social', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', color: '#10b981' },
         { id: 2, name: 'Coding Club', desc: 'Weekly coding challenges, competitive programming, and project building. Open to all branches.', members: 245, category: 'Technical', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4', color: '#3b82f6' },
         { id: 3, name: 'Music Club', desc: 'Instrumental and vocal training, jam sessions, and performances at college events.', members: 203, category: 'Cultural', icon: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3', color: '#ec4899' },
@@ -167,23 +164,13 @@ function ClubsContent() {
         { id: 6, name: 'Debate & MUN Society', desc: 'Model United Nations, parliamentary debates, and public speaking workshops.', members: 134, category: 'Academic', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', color: '#06b6d4' },
         { id: 7, name: 'Drama & Theatre Club', desc: 'Perform in campus plays, street plays, and competitions. No prior experience needed!', members: 112, category: 'Cultural', icon: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z', color: '#8b5cf6' },
         { id: 8, name: 'Robotics Society', desc: 'Build and program robots for national competitions. Annual RoboWars event organized by us.', members: 89, category: 'Technical', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', color: '#ef4444' }
-      ];
-      saveClubs(defaultClubs);
-      return defaultClubs;
-    }
-    return stored;
-  });
+  ];
+  const [clubs, setClubs] = useState(defaultClubs);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newClub, setNewClub] = useState({name: '', desc: '', members: 0, category: 'Technical', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4', color: '#3b82f6', whatsapp: '', fee: 500, gpay: ''});
-  
+
   useEffect(() => {
-    const handleStorageChange = () => setClubs(getClubs());
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    getClubs().then(data => { if (Array.isArray(data) && data.length > 0) setClubs(data); }).catch(() => {});
   }, []);
 
   const totalMembers = clubs.reduce((sum, club) => sum + club.members, 0);
@@ -369,87 +356,43 @@ function NotificationsContent() {
 
 function EventsContent() {
   const [filter, setFilter] = useState('All');
-  const [removedEvents, setRemovedEvents] = useState(getRemovedEvents());
-  const [eventCounts, setEventCounts] = useState(() => {
-    const saved = localStorage.getItem('eventCounts');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [events, setEvents] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [customEvents, setCustomEvents] = useState(getEvents());
   const [newEvent, setNewEvent] = useState({
-    type: 'Workshop',
-    title: '',
-    desc: '',
-    date: '',
-    time: '',
-    location: '',
-    capacity: '100',
-    daysLeft: 0
+    type: 'Workshop', title: '', desc: '', date: '', time: '', location: '', capacity: '100', daysLeft: 0
   });
-  
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem('eventCounts');
-      if (saved) {
-        setEventCounts(JSON.parse(saved));
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 500);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
-  
-  const allEvents = [
-    { id: 1, type: 'Workshop', title: 'Workshop: AI & Machine Learning', desc: 'Hands-on workshop on modern AI/ML techniques. Learn neural networks, NLP, and computer vision. Certificate will be provided to...', date: '25 February 2026', time: '10:00 AM', location: 'Computer Lab 3, Block A', registered: '58/60', percent: 97, daysLeft: 6, color: '#0d9488' },
-    { id: 2, type: 'Seminar', title: 'Leadership & Entrepreneurship Summit', desc: 'Learn from successful entrepreneurs and industry leaders. Panel discussions, networking sessions, and startup pitching competition...', date: '28 February 2026', time: '10:00 AM', location: 'Conference Hall, Admin Block', registered: '210/300', percent: 70, daysLeft: 9, color: '#7c3aed' },
-    { id: 3, type: 'Placement', title: 'Campus Recruitment Drive - Top MNCs', desc: 'Exclusive placement drive featuring Google, Microsoft, Amazon, and 20+ other companies. On-the-spot interviews and offers. Register...', date: '5 March 2026', time: '08:00 AM', location: 'Placement Cell, Block B', registered: '187/200', percent: 94, daysLeft: 14, color: '#059669' },
-    { id: 4, type: 'Technical', title: 'TechFest 2026 - Annual Technical Festival', desc: 'Join us for the biggest tech festival of the year! Participate in hackathons, coding competitions, robotics challenges, and AI/ML...', date: '10 March 2026', time: '09:00 AM', location: 'Main Auditorium & Tech Park', registered: '342/500', percent: 68, daysLeft: 19, color: '#1e40af' },
-    { id: 5, type: 'Sports', title: 'Sports Week 2026', desc: 'Annual inter-department sports competition. Events include cricket, football, basketball, badminton, chess, and athletics. Register your...', date: '15 March 2026', time: '07:00 AM', location: 'Sports Complex & Ground', registered: '456/1000', percent: 46, daysLeft: 24, color: '#8b5cf6' },
-    { id: 6, type: 'Cultural', title: 'Cultural Night 2026 - Rang Mahotsav', desc: 'The grandest cultural celebration! Dance, music, drama, and talent show. Showcase your talents and win exciting prizes. Open to all...', date: '20 March 2026', time: '06:00 PM', location: 'Open Air Theatre', registered: '523/800', percent: 65, daysLeft: 29, color: '#7e22ce' },
-    ...customEvents
-  ];
 
-  const events = allEvents.filter(e => !removedEvents.includes(e.id));
+  useEffect(() => {
+    getEvents().then(data => { if (Array.isArray(data)) setEvents(data); }).catch(() => {});
+  }, []);
+
   const filtered = filter === 'All' ? events : events.filter(e => e.type === filter);
 
-  const handleRemove = (eventId) => {
-    const updated = [...removedEvents, eventId];
-    setRemovedEvents(updated);
-    saveRemovedEvents(updated);
+  const handleRemove = (event) => {
+    const id = event.event_id || event.id;
+    removeEvent(id).catch(() => {});
+    setEvents(prev => prev.filter(e => (e.event_id || e.id) !== id));
   };
 
   const handleDownloadList = async (event) => {
     try {
-      const { ref, get } = await import('firebase/database');
-      const { database } = await import('../../firebase/config');
-      
-      if (!database) {
-        alert('Firebase not configured');
-        return;
-      }
-      
-      const registrationsRef = ref(database, `event_registrations/${event.id}`);
-      const snapshot = await get(registrationsRef);
-      
-      if (!snapshot.exists()) {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:5000/api/db/event_registrations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const allDocs = await res.json();
+      const registeredStudents = allDocs.filter(d => d._docId?.startsWith(`${event.id}_`));
+
+      if (registeredStudents.length === 0) {
         alert('No students have registered for this event yet.');
         return;
       }
-      
-      const registeredStudents = [];
-      snapshot.forEach(child => {
-        registeredStudents.push(child.val());
-      });
-      
+
       let csv = `Event: ${event.title}\nType: ${event.type}\nDate: ${event.date}\nTime: ${event.time}\nLocation: ${event.location}\nRegistered: ${registeredStudents.length}\n\nRegistered Students:\nName,Email,Phone,Student ID,Department\n`;
-      
       registeredStudents.forEach(student => {
         csv += `${student.name},${student.email},${student.phone},${student.student_id},${student.department || 'N/A'}\n`;
       });
-      
+
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -473,25 +416,16 @@ function EventsContent() {
       alert('Please fill all required fields');
       return;
     }
-    const event = {id: Date.now(), ...newEvent, registered: `0/${newEvent.capacity}`, color: getEventColor(newEvent.type), percent: 0};
-    const updated = [...customEvents, event];
-    setCustomEvents(updated);
-    saveEvents(updated);
-    setShowAddModal(false);
-    setNewEvent({type: 'Workshop', title: '', desc: '', date: '', time: '', location: '', capacity: '100', daysLeft: 0});
+    addEvent({ ...newEvent, registered: `0/${newEvent.capacity}`, color: getEventColor(newEvent.type), percent: 0 })
+      .then(saved => {
+        setEvents(prev => [...prev, saved]);
+        setShowAddModal(false);
+        setNewEvent({type: 'Workshop', title: '', desc: '', date: '', time: '', location: '', capacity: '100', daysLeft: 0});
+      }).catch(() => alert('Failed to add event'));
   };
 
-  const getRegisteredCount = (event) => {
-    const [current, total] = event.registered.split('/');
-    const newCurrent = parseInt(current) + (eventCounts[event.id] || 0);
-    return `${newCurrent}/${total}`;
-  };
-
-  const getPercent = (event) => {
-    const [current, total] = event.registered.split('/');
-    const newCurrent = parseInt(current) + (eventCounts[event.id] || 0);
-    return Math.round((newCurrent / parseInt(total)) * 100);
-  };
+  const getRegisteredCount = (event) => event.registered || '0/100';
+  const getPercent = (event) => event.percent || 0;
 
   return (
     <div className="events-content">
@@ -541,7 +475,7 @@ function EventsContent() {
               </div>
             </div>
             <div style={{display: 'flex', gap: '8px'}}>
-              <button className="register-btn" style={{borderColor: '#ef4444', color: '#ef4444', background: 'rgba(239,68,68,0.1)', flex: 1}} onClick={() => handleRemove(event.id)}>
+              <button className="register-btn" style={{borderColor: '#ef4444', color: '#ef4444', background: 'rgba(239,68,68,0.1)', flex: 1}} onClick={() => handleRemove(event)}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
@@ -837,20 +771,12 @@ function MeritListContent() {
 
 function InternshipsContent() {
   const [filter, setFilter] = useState('All');
-  const [jobs, setJobs] = useState(getJobs());
-  const [internships, setInternships] = useState(getInternships());
-  
+  const [jobs, setJobs] = useState([]);
+  const [internships, setInternships] = useState([]);
+
   useEffect(() => {
-    const handleStorageChange = () => {
-      setJobs(getJobs());
-      setInternships(getInternships());
-    };
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    getJobs().then(data => { if (Array.isArray(data)) setJobs(data); }).catch(() => {});
+    getInternships().then(data => { if (Array.isArray(data)) setInternships(data); }).catch(() => {});
   }, []);
   
   const opportunities = [...internships, ...jobs];
@@ -892,19 +818,24 @@ function InternshipsContent() {
 
 function DashboardContent() {
   const [stats, setStats] = useState({jobs: 0, internships: 0, clubs: 0, events: 0, students: 0});
-  
+  const [nextEvent, setNextEvent] = useState(null);
+  const [totalMembers, setTotalMembers] = useState(0);
+
   useEffect(() => {
-    setStats({
-      jobs: getJobs().length,
-      internships: getInternships().length,
-      clubs: getClubs().length,
-      events: getEvents().length,
-      students: JSON.parse(localStorage.getItem('students') || '[]').length
+    Promise.all([getJobs(), getInternships(), getClubs(), getEvents()]).then(([j, i, c, e]) => {
+      const clubs = Array.isArray(c) ? c : [];
+      const events = Array.isArray(e) ? e : [];
+      setStats({
+        jobs: (Array.isArray(j) ? j : []).length,
+        internships: (Array.isArray(i) ? i : []).length,
+        clubs: clubs.length,
+        events: events.length,
+        students: JSON.parse(localStorage.getItem('students') || '[]').length
+      });
+      setNextEvent(events[0] || null);
+      setTotalMembers(clubs.reduce((sum, c) => sum + (c.members || 0), 0));
     });
   }, []);
-  
-  const nextEvent = getEvents()[0];
-  const totalMembers = getClubs().reduce((sum, c) => sum + c.members, 0);
   
   return (
     <div className="dashboard-content">

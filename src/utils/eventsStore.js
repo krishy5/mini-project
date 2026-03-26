@@ -1,20 +1,49 @@
-const EVENTS_KEY = 'campus_events';
-const REMOVED_KEY = 'removed_events';
+const API = 'http://localhost:5000/api';
+const token = () => localStorage.getItem('token');
 
-export const getEvents = () => {
-  const stored = localStorage.getItem(EVENTS_KEY);
-  return stored ? JSON.parse(stored) : [];
+export const getEvents = async () => {
+  try {
+    const res = await fetch(`${API}/events`);
+    return await res.json();
+  } catch { return []; }
 };
 
-export const saveEvents = (events) => {
-  localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+export const saveEvents = async (events) => {
+  // events are saved individually via POST /api/events
 };
 
-export const getRemovedEvents = () => {
-  const stored = localStorage.getItem(REMOVED_KEY);
-  return stored ? JSON.parse(stored) : [];
+export const addEvent = async (eventData) => {
+  const res = await fetch(`${API}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+    body: JSON.stringify(eventData)
+  });
+  return await res.json();
 };
 
-export const saveRemovedEvents = (removed) => {
-  localStorage.setItem(REMOVED_KEY, JSON.stringify(removed));
+export const removeEvent = async (event_id) => {
+  await fetch(`${API}/events/${event_id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token()}` }
+  });
 };
+
+export const registerForEvent = async (event_id, studentData) => {
+  const res = await fetch(`${API}/events/${event_id}/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+    body: JSON.stringify(studentData)
+  });
+  return await res.json();
+};
+
+export const getEventRegistrations = async (event_id) => {
+  const res = await fetch(`${API}/events/${event_id}/registrations`, {
+    headers: { Authorization: `Bearer ${token()}` }
+  });
+  return await res.json();
+};
+
+// Legacy sync fallbacks for components not yet migrated
+export const getRemovedEvents = () => [];
+export const saveRemovedEvents = () => {};

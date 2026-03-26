@@ -7,6 +7,7 @@ import { getEvents, getRemovedEvents } from '../../utils/eventsStore';
 import { getJobs, getInternships } from '../../utils/jobsStore';
 import { getClubs, saveClubs } from '../../utils/clubsStore';
 import MarksheetUpload from './MarksheetUpload';
+import { getStudentProfile, saveStudentProfile, saveSkills, saveExperiences, saveCertificates, saveMarksheets, registerForEvent, joinClubDB, applyForJobDB } from '../../api/profiles';
 
 function StudentDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -23,10 +24,15 @@ function StudentDashboard() {
   }, [theme]);
 
   useEffect(() => {
-    const hash = window.location.hash.replace('#', '');
-    if (hash && ['internships', 'events', 'clubs', 'profile'].includes(hash)) {
-      setActiveTab(hash);
-    }
+    const handleHash = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash && ['internships', 'events', 'clubs', 'profile'].includes(hash)) {
+        setActiveTab(hash);
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
   const getPageTitle = () => {
@@ -179,39 +185,52 @@ function ProfileContent() {
   const [skills, setSkills] = useState([]);
   
   const [newSkill, setNewSkill] = useState({name: '', percent: 50, color: '#3b82f6'});
-  
-  const handleAddSkill = () => {
-    if (!newSkill.name) {
-      showToastMsg('Please enter skill name');
-      return;
-    }
-    const updatedSkills = [...skills, {...newSkill}];
-    setSkills(updatedSkills);
-    const profiles = JSON.parse(localStorage.getItem('studentProfiles') || '{}');
-    profiles[student.student_id] = {...profileData, skills: updatedSkills, experiences, certificates};
-    localStorage.setItem('studentProfiles', JSON.stringify(profiles));
-    setNewSkill({name: '', percent: 50, color: '#3b82f6'});
-    showToastMsg('Skill added successfully');
-  };
-  
-  const handleRemoveSkill = (index) => {
-    setSkills(skills.filter((_, i) => i !== index));
-    showToastMsg('Skill removed');
-  };
-  
   const [experiences, setExperiences] = useState([]);
-  
   const [certificates, setCertificates] = useState([]);
-  
   const [newExp, setNewExp] = useState({role: '', company: '', duration: '', type: 'Internship', desc: '', link: ''});
   const [newCert, setNewCert] = useState({name: '', issuer: '', year: '', link: ''});
-  
+
+  // Load profile from MongoDB on mount
+  useEffect(() => {
+    if (!student.student_id) return;
+    getStudentProfile(student.student_id).then(data => {
+      if (data) {
+        setProfileData(prev => ({ ...prev, ...data }));
+        setFormData(prev => ({ ...prev, ...data }));
+        setSkills(data.skills || []);
+        setExperiences(data.experiences || []);
+        setCertificates(data.certificates || []);
+        if (Array.isArray(data.marksheets)) {
+          const ms = {};
+          data.marksheets.forEach(m => { ms[m.semester] = m; });
+          setMarksheets(ms);
+        }
+      }
+    }).catch(() => {});
+  }, [student.student_id]);
+
   const showToastMsg = (msg) => {
     setToastMsg(msg);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
   
+  const handleAddSkill = () => {
+    if (!newSkill.name) { showToastMsg('Please enter skill name'); return; }
+    const updatedSkills = [...skills, {...newSkill}];
+    setSkills(updatedSkills);
+    saveSkills(student.student_id, updatedSkills).catch(() => {});
+    setNewSkill({name: '', percent: 50, color: '#3b82f6'});
+    showToastMsg('Skill added successfully');
+  };
+
+  const handleRemoveSkill = (index) => {
+    const updatedSkills = skills.filter((_, i) => i !== index);
+    setSkills(updatedSkills);
+    saveSkills(student.student_id, updatedSkills).catch(() => {});
+    showToastMsg('Skill removed');
+  };
+
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = 'Name is required';
@@ -225,9 +244,7 @@ function ProfileContent() {
   const handleSaveProfile = () => {
     if (validateForm()) {
       setProfileData({...formData});
-      const profiles = JSON.parse(localStorage.getItem('studentProfiles') || '{}');
-      profiles[student.student_id] = {...formData, skills, experiences, certificates, resume, marksheets};
-      localStorage.setItem('studentProfiles', JSON.stringify(profiles));
+      saveStudentProfile(student.student_id, {...formData, skills, experiences, certificates}).catch(() => {});
       setShowEditModal(false);
       showToastMsg('Profile updated successfully');
     }
@@ -297,48 +314,41 @@ function ProfileContent() {
   };
   
   const handleAddExperience = () => {
-    if (!newExp.role || !newExp.company || !newExp.duration) {
-      showToastMsg('Please fill all required fields');
-      return;
-    }
+    if (!newExp.role || !newExp.company || !newExp.duration) { showToastMsg('Please fill all required fields'); return; }
     const updatedExp = [...experiences, {...newExp, id: Date.now()}];
     setExperiences(updatedExp);
-    const profiles = JSON.parse(localStorage.getItem('studentProfiles') || '{}');
-    profiles[student.student_id] = {...profileData, skills, experiences: updatedExp, certificates};
-    localStorage.setItem('studentProfiles', JSON.stringify(profiles));
+    saveExperiences(student.student_id, updatedExp).catch(() => {});
     setNewExp({role: '', company: '', duration: '', type: 'Internship', desc: '', link: ''});
     setShowExpModal(false);
     showToastMsg('Experience added successfully');
   };
   
   const handleAddCertificate = () => {
-    if (!newCert.name || !newCert.issuer || !newCert.year) {
-      showToastMsg('Please fill all required fields');
-      return;
-    }
+    if (!newCert.name || !newCert.issuer || !newCert.year) { showToastMsg('Please fill all required fields'); return; }
     const updatedCerts = [...certificates, {...newCert, id: Date.now()}];
     setCertificates(updatedCerts);
-    const profiles = JSON.parse(localStorage.getItem('studentProfiles') || '{}');
-    profiles[student.student_id] = {...profileData, skills, experiences, certificates: updatedCerts};
-    localStorage.setItem('studentProfiles', JSON.stringify(profiles));
+    saveCertificates(student.student_id, updatedCerts).catch(() => {});
     setNewCert({name: '', issuer: '', year: '', link: ''});
     setShowCertModal(false);
     showToastMsg('Certificate added successfully');
   };
   
   const handleRemoveCertificate = (id) => {
-    setCertificates(certificates.filter(cert => cert.id !== id));
+    const updated = certificates.filter(cert => cert.id !== id);
+    setCertificates(updated);
+    saveCertificates(student.student_id, updated).catch(() => {});
     showToastMsg('Certificate removed');
   };
   
   const handleRemoveExperience = (id) => {
-    setExperiences(experiences.filter(exp => exp.id !== id));
+    const updated = experiences.filter(exp => exp.id !== id);
+    setExperiences(updated);
+    saveExperiences(student.student_id, updated).catch(() => {});
     showToastMsg('Experience removed');
   };
   
   return (
     <div className="profile-content">
-      {console.log('showEditModal:', showEditModal)}
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -939,33 +949,20 @@ function ClubsContent() {
   });
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptClub, setReceiptClub] = useState(null);
-  const [clubs, setClubs] = useState(() => {
-    const stored = getClubs();
-    if (stored.length === 0) {
-      const defaultClubs = [
-        { id: 1, name: 'NSS - National Service Scheme', desc: 'Community service, blood donation drives, cleanliness campaigns, and rural outreach programs.', members: 334, category: 'Social', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', color: '#10b981' },
-        { id: 2, name: 'Coding Club', desc: 'Weekly coding challenges, competitive programming, and project building. Open to all branches.', members: 245, category: 'Technical', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4', color: '#3b82f6' },
-        { id: 3, name: 'Music Club', desc: 'Instrumental and vocal training, jam sessions, and performances at college events.', members: 203, category: 'Cultural', icon: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3', color: '#ec4899' },
-        { id: 4, name: 'Entrepreneurship Cell', desc: 'Startup ideas to reality. Mentorship programs, investor connections, and pitch competitions.', members: 178, category: 'Academic', icon: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z', color: '#f59e0b' },
-        { id: 5, name: 'Photography Club', desc: 'Capture campus life and memories. Monthly photo walks and workshops by professional photographers.', members: 156, category: 'Cultural', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z', color: '#8b5cf6' },
-        { id: 6, name: 'Debate & MUN Society', desc: 'Model United Nations, parliamentary debates, and public speaking workshops.', members: 134, category: 'Academic', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', color: '#06b6d4' },
-        { id: 7, name: 'Drama & Theatre Club', desc: 'Perform in campus plays, street plays, and competitions. No prior experience needed!', members: 112, category: 'Cultural', icon: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z', color: '#f59e0b' },
-        { id: 8, name: 'Robotics Society', desc: 'Build and program robots for national competitions. Annual RoboWars event organized by us.', members: 89, category: 'Technical', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', color: '#ef4444' }
-      ];
-      saveClubs(defaultClubs);
-      return defaultClubs;
-    }
-    return stored;
-  });
-  
+  const defaultClubs = [
+    { id: 1, name: 'NSS - National Service Scheme', desc: 'Community service, blood donation drives, cleanliness campaigns, and rural outreach programs.', members: 334, category: 'Social', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', color: '#10b981' },
+    { id: 2, name: 'Coding Club', desc: 'Weekly coding challenges, competitive programming, and project building. Open to all branches.', members: 245, category: 'Technical', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4', color: '#3b82f6' },
+    { id: 3, name: 'Music Club', desc: 'Instrumental and vocal training, jam sessions, and performances at college events.', members: 203, category: 'Cultural', icon: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3', color: '#ec4899' },
+    { id: 4, name: 'Entrepreneurship Cell', desc: 'Startup ideas to reality. Mentorship programs, investor connections, and pitch competitions.', members: 178, category: 'Academic', icon: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z', color: '#f59e0b' },
+    { id: 5, name: 'Photography Club', desc: 'Capture campus life and memories. Monthly photo walks and workshops by professional photographers.', members: 156, category: 'Cultural', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z', color: '#8b5cf6' },
+    { id: 6, name: 'Debate & MUN Society', desc: 'Model United Nations, parliamentary debates, and public speaking workshops.', members: 134, category: 'Academic', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', color: '#06b6d4' },
+    { id: 7, name: 'Drama & Theatre Club', desc: 'Perform in campus plays, street plays, and competitions. No prior experience needed!', members: 112, category: 'Cultural', icon: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z', color: '#f59e0b' },
+    { id: 8, name: 'Robotics Society', desc: 'Build and program robots for national competitions. Annual RoboWars event organized by us.', members: 89, category: 'Technical', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', color: '#ef4444' }
+  ];
+  const [clubs, setClubs] = useState(defaultClubs);
+
   useEffect(() => {
-    const handleStorageChange = () => setClubs(getClubs());
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    getClubs().then(data => { if (Array.isArray(data) && data.length > 0) setClubs(data); }).catch(() => {});
   }, []);
 
   const totalMembers = clubs.reduce((sum, club) => sum + club.members, 0);
@@ -1349,82 +1346,61 @@ function EventsContent() {
     const saved = localStorage.getItem('eventCounts');
     return saved ? JSON.parse(saved) : {};
   });
-  const [customEvents, setCustomEvents] = useState([]);
-  const [removedEvents, setRemovedEvents] = useState([]);
-  
+  const [events, setEvents] = useState([]);
+
   useEffect(() => {
-    setCustomEvents(getEvents());
-    setRemovedEvents(getRemovedEvents());
-    
-    const handleStorageChange = () => {
-      setCustomEvents(getEvents());
-      setRemovedEvents(getRemovedEvents());
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    getEvents().then(apiEvents => {
+      if (Array.isArray(apiEvents)) setEvents(apiEvents);
+    }).catch(() => {});
   }, []);
-  
-  const events = [
-    { id: 1, type: 'Workshop', title: 'Workshop: AI & Machine Learning', desc: 'Hands-on workshop on modern AI/ML techniques. Learn neural networks, NLP, and computer vision. Certificate will be provided to...', date: '25 February 2026', time: '10:00 AM', location: 'Computer Lab 3, Block A', registered: '58/60', percent: 97, daysLeft: 6, color: '#0d9488' },
-    { id: 2, type: 'Seminar', title: 'Leadership & Entrepreneurship Summit', desc: 'Learn from successful entrepreneurs and industry leaders. Panel discussions, networking sessions, and startup pitching competition...', date: '28 February 2026', time: '10:00 AM', location: 'Conference Hall, Admin Block', registered: '210/300', percent: 70, daysLeft: 9, color: '#7c3aed' },
-    { id: 3, type: 'Placement', title: 'Campus Recruitment Drive - Top MNCs', desc: 'Exclusive placement drive featuring Google, Microsoft, Amazon, and 20+ other companies. On-the-spot interviews and offers. Register...', date: '5 March 2026', time: '08:00 AM', location: 'Placement Cell, Block B', registered: '187/200', percent: 94, daysLeft: 14, color: '#059669' },
-    { id: 4, type: 'Technical', title: 'TechFest 2026 - Annual Technical Festival', desc: 'Join us for the biggest tech festival of the year! Participate in hackathons, coding competitions, robotics challenges, and AI/ML...', date: '10 March 2026', time: '09:00 AM', location: 'Main Auditorium & Tech Park', registered: '342/500', percent: 68, daysLeft: 19, color: '#1e40af' },
-    { id: 5, type: 'Sports', title: 'Sports Week 2026', desc: 'Annual inter-department sports competition. Events include cricket, football, basketball, badminton, chess, and athletics. Register your...', date: '15 March 2026', time: '07:00 AM', location: 'Sports Complex & Ground', registered: '456/1000', percent: 46, daysLeft: 24, color: '#c2410c' },
-    { id: 6, type: 'Cultural', title: 'Cultural Night 2026 - Rang Mahotsav', desc: 'The grandest cultural celebration! Dance, music, drama, and talent show. Showcase your talents and win exciting prizes. Open to all...', date: '20 March 2026', time: '06:00 PM', location: 'Open Air Theatre', registered: '523/800', percent: 65, daysLeft: 29, color: '#7e22ce' },
-    ...customEvents
-  ].filter(e => !removedEvents.includes(e.id));
 
   const filtered = filter === 'All' ? events : events.filter(e => e.type === filter);
 
-  const handleRegister = async (eventId) => {
-    if (!registeredEvents.includes(eventId)) {
+
+  const handleRegister = async (eventKey) => {
+    if (!registeredEvents.includes(eventKey)) {
       const student = JSON.parse(localStorage.getItem('currentStudent') || '{}');
-      const newRegistered = [...registeredEvents, eventId];
-      const newCounts = {...eventCounts, [eventId]: (eventCounts[eventId] || 0) + 1};
+      const newRegistered = [...registeredEvents, eventKey];
+      const newCounts = {...eventCounts, [eventKey]: (eventCounts[eventKey] || 0) + 1};
       setRegisteredEvents(newRegistered);
       setEventCounts(newCounts);
       localStorage.setItem('registeredEvents', JSON.stringify(newRegistered));
       localStorage.setItem('eventCounts', JSON.stringify(newCounts));
       
       try {
-        const { ref, push } = await import('firebase/database');
-        const { database } = await import('../../firebase/config');
-        console.log('Database:', database);
-        if (database) {
-          const registrationRef = ref(database, `event_registrations/${eventId}`);
-          const studentData = {
-            student_id: student.student_id || student.uid,
+        const token = localStorage.getItem('token');
+        await fetch(`http://localhost:5000/api/events/${eventKey}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            student_id: student.student_id,
             email: student.email,
             phone: student.phone || 'N/A',
             name: student.email?.split('@')[0] || 'Student',
-            department: 'Computer Science',
-            registered_at: new Date().toISOString()
-          };
-          console.log('Saving to Firebase:', studentData);
-          await push(registrationRef, studentData);
-          console.log('Saved successfully');
-        } else {
-          console.error('Database not initialized');
-        }
-      } catch (err) {
-        console.error('Error saving to Firebase:', err);
-      }
+            department: 'Computer Science'
+          })
+        });
+      } catch (err) {}
     }
   };
 
   const getRegisteredCount = (event) => {
+    if (typeof event.registered !== 'string' || !event.registered.includes('/')) {
+      const count = (event.registered_count || 0) + (eventCounts[event._id || event.id] || 0);
+      const cap = event.capacity || 100;
+      return `${count}/${cap}`;
+    }
     const [current, total] = event.registered.split('/');
     const newCurrent = parseInt(current) + (eventCounts[event.id] || 0);
     return `${newCurrent}/${total}`;
   };
 
   const getPercent = (event) => {
+    if (typeof event.registered !== 'string' || !event.registered.includes('/')) {
+      const count = (event.registered_count || 0) + (eventCounts[event._id || event.id] || 0);
+      const cap = event.capacity || 100;
+      return Math.round((count / cap) * 100);
+    }
     const [current, total] = event.registered.split('/');
     const newCurrent = parseInt(current) + (eventCounts[event.id] || 0);
     return Math.round((newCurrent / parseInt(total)) * 100);
@@ -1448,8 +1424,10 @@ function EventsContent() {
         <button className={filter === 'Cultural' ? 'active' : ''} onClick={() => setFilter('Cultural')}>Cultural</button>
       </div>
       <div className="events-grid">
-        {filtered.map(event => (
-          <div key={event.id} className="event-card" style={{borderColor: event.color + '40'}}>
+        {filtered.map(event => {
+          const eventKey = event._id || event.id;
+          return (
+          <div key={eventKey} className="event-card" style={{borderColor: event.color + '40'}}>
             <div className="event-card-header">
               <span className="event-type" style={{backgroundColor: event.color + '30', color: event.color}}>{event.type}</span>
               <span className="days-left">{event.daysLeft} days left</span>
@@ -1471,8 +1449,8 @@ function EventsContent() {
                 <div className="reg-bar" style={{width: getPercent(event) + '%', backgroundColor: getPercent(event) > 90 ? '#ef4444' : getPercent(event) > 70 ? '#f59e0b' : '#3b82f6'}}></div>
               </div>
             </div>
-            <button className="register-btn" style={{borderColor: event.color, color: event.color, ...(registeredEvents.includes(event.id) && {background: event.color, color: 'white'})}} onClick={() => handleRegister(event.id)} disabled={registeredEvents.includes(event.id)}>
-              {registeredEvents.includes(event.id) ? (
+            <button className="register-btn" style={{borderColor: event.color, color: event.color, ...(registeredEvents.includes(eventKey) && {background: event.color, color: 'white'})}} onClick={() => handleRegister(eventKey)} disabled={registeredEvents.includes(eventKey)}>
+              {registeredEvents.includes(eventKey) ? (
                 <>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M20 6L9 17l-5-5"/>
@@ -1482,7 +1460,8 @@ function EventsContent() {
               ) : 'Register Now'}
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1589,20 +1568,12 @@ function InternshipsContent() {
   });
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [jobs, setJobs] = useState(getJobs());
-  const [internships, setInternships] = useState(getInternships());
-  
+  const [jobs, setJobs] = useState([]);
+  const [internships, setInternships] = useState([]);
+
   useEffect(() => {
-    const handleStorageChange = () => {
-      setJobs(getJobs());
-      setInternships(getInternships());
-    };
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    getJobs().then(data => { if (Array.isArray(data)) setJobs(data); }).catch(() => {});
+    getInternships().then(data => { if (Array.isArray(data)) setInternships(data); }).catch(() => {});
   }, []);
   
   const opportunities = [...internships, ...jobs];
@@ -1727,28 +1698,31 @@ function DashboardContent() {
   const semester = student.semester || '5';
   
   const [stats, setStats] = useState({jobs: 0, internships: 0, clubs: 0, events: 0});
+  const [events, setEvents] = useState([]);
+  const [clubs, setClubs] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [cgpa, setCgpa] = useState(0);
+  const [profileSemester, setProfileSemester] = useState(semester);
   
   useEffect(() => {
-    setStats({
-      jobs: getJobs().length,
-      internships: getInternships().length,
-      clubs: getClubs().length,
-      events: getEvents().length
+    Promise.all([getJobs(), getInternships(), getClubs(), getEvents()]).then(([j, i, c, e]) => {
+      setStats({ jobs: (j||[]).length, internships: (i||[]).length, clubs: (c||[]).length, events: (e||[]).length });
+      setJobs((j||[]).slice(0, 1));
+      setClubs((c||[]).slice(0, 2));
+      setEvents((e||[]).slice(0, 2));
     });
+    if (studentId) {
+      getStudentProfile(studentId).then(data => {
+        if (data) { setCgpa(data.cgpa || 0); setProfileSemester(data.semester || semester); }
+      }).catch(() => {});
+    }
   }, []);
-  
-  const events = getEvents().filter((_, idx) => idx < 2);
-  const clubs = getClubs().filter((_, idx) => idx < 2);
-  const jobs = getJobs().filter((_, idx) => idx < 1);
   
   const activities = [
     ...jobs.map(j => ({ text: `${j.company} job posted`, time: 'New', color: 'blue', link: 'internships' })),
     ...events.map(e => ({ text: `${e.title}`, time: `${e.daysLeft} days left`, color: 'green', link: 'events' })),
     ...clubs.map(c => ({ text: `${c.name} - ${c.members} members`, time: 'Active', color: 'yellow', link: 'clubs' }))
   ].slice(0, 4);
-  
-  const profileData = JSON.parse(localStorage.getItem('studentProfiles') || '{}')[studentId] || {};
-  const cgpa = profileData.cgpa || 0;
   
   return (
     <div className="dashboard-content">
@@ -1856,7 +1830,7 @@ function DashboardContent() {
           <div className="cgpa-card">
             <div className="cgpa-header">
               <span>Your SGPA</span>
-              <span className="semester">Semester {profileData.semester || semester}</span>
+              <span className="semester">Semester {profileSemester}</span>
             </div>
             <h2>{cgpa.toFixed(2)} <span>/ 10.0</span></h2>
             <div className="progress-bar">

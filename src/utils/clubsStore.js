@@ -1,11 +1,44 @@
-const CLUBS_KEY = 'campus_clubs';
+const API = 'http://localhost:5000/api';
+const token = () => localStorage.getItem('token');
 
-export const getClubs = () => {
-  const stored = localStorage.getItem(CLUBS_KEY);
-  return stored ? JSON.parse(stored) : [];
+export const getClubs = async () => {
+  try {
+    const res = await fetch(`${API}/clubs`);
+    return await res.json();
+  } catch { return []; }
 };
 
-export const saveClubs = (clubs) => {
-  localStorage.setItem(CLUBS_KEY, JSON.stringify(clubs));
-  window.dispatchEvent(new Event('storage'));
+export const addClub = async (clubData) => {
+  const res = await fetch(`${API}/clubs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+    body: JSON.stringify(clubData)
+  });
+  return await res.json();
 };
+
+export const deleteClub = async (club_id) => {
+  await fetch(`${API}/clubs/${club_id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token()}` }
+  });
+};
+
+export const joinClub = async (club_id, memberData) => {
+  const res = await fetch(`${API}/clubs/${club_id}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+    body: JSON.stringify(memberData)
+  });
+  return await res.json();
+};
+
+export const getClubMembers = async (club_id) => {
+  const res = await fetch(`${API}/clubs/${club_id}/members`, {
+    headers: { Authorization: `Bearer ${token()}` }
+  });
+  return await res.json();
+};
+
+// Legacy sync fallback
+export const saveClubs = () => {};
