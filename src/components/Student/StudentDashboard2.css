@@ -1,0 +1,93 @@
+/* Student Dashboard Specific Styles */
+.student-dashboard-layout .sidebar-nav button.active {
+  background: linear-gradient(90deg, #3b82f6, #2563eb) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+.student-dashboard-layout .logo-icon {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+}
+
+.student-dashboard-layout .avatar {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+}
+
+.student-dashboard-layout .profile-btn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+}
+
+.student-dashboard-layout .greeting-card {
+  background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
+}
+
+.student-dashboard-layout .filter-buttons button.active {
+  background: #3b82f6 !important;
+}
+
+.student-dashboard-layout .profile-header-card {
+  background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
+}
+
+.student-dashboard-layout .profile-avatar-large {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+}
+
+.student-dashboard-layout .message-avatar {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+}
+
+.student-dashboard-layout .chat-avatar {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+}
+
+.student-dashboard-layout .chat-message.mine .message-bubble {
+  background: #3b82f6 !important;
+}
+
+.student-dashboard-layout .chat-input button {
+  background: #3b82f6 !important;
+}
+
+.student-dashboard-layout .chat-input button:hover {
+  background: #2563eb !important;
+}
+
+.student-dashboard-layout .progress {
+  background: linear-gradient(90deg, #3b82f6, #2563eb) !important;
+}
+
+.student-dashboard-layout .cgpa-fill {
+  background: linear-gradient(90deg, #3b82f6, #2563eb) !important;
+}
+
+.student-dashboard-layout .payment-filters button.active {
+  background: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+}
+
+.student-dashboard-layout .pay-now-btn {
+  background: #3b82f6 !important;
+}
+
+.student-dashboard-layout .pay-now-btn:hover {
+  background: #2563eb !important;
+}
+
+.student-dashboard-layout .save-changes-btn {
+  background: #3b82f6 !important;
+}
+
+.student-dashboard-layout .save-changes-btn:hover {
+  background: #2563eb !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+}
+
+.student-dashboard-layout .club-filters button.active {
+  background: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+}
+
+.student-dashboard-layout .event-filters button.active {
+  background: #3b82f6 !important;
+}
